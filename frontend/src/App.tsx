@@ -37,8 +37,17 @@ function App() {
       const matchesSearch = searchTerm === '' || 
         insight.event_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         insight.explanation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        insight.merchant?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        insight.user_id?.toLowerCase().includes(searchTerm.toLowerCase());
+        insight.transaction_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.card_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.customer_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.merchant_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.card_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.merchant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.state.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.amount.toString().includes(searchTerm);
       
       return matchesRisk && matchesSearch;
     });
