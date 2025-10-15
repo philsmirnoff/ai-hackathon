@@ -2,28 +2,39 @@ import os
 import json
 import boto3
 from strands import Agent, tool
-from strands.tools.mcp import MCPClient
-from mcp.client.streamable_http import streamablehttp_client
+from topic_analyzer import TopicAnalyzer, LENSES_TOPICS
+from mcp_client import LensesMCPClient
 
 # Configure AWS Bedrock model
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 @tool
-def query_fraud_transactions(topic="credit-card-transactions", limit=10):
-    """Query real-time fraud transactions from Lenses.io via MCP"""
-    try:
-        # Connect to your Lenses MCP server
-        mcp_client = MCPClient("http://108.129.168.213:8080/mcp")
-        
-        # Query the topic
-        result = mcp_client.call_tool("query_topic", {
-            "topic": topic,
-            "limit": limit
-        })
-        
-        return result
-    except Exception as e:
-        return f"Error querying transactions: {e}"
+def discover_fraud_topics():
+    """Dynamically discover and rank fraud-relevant topics"""
+    analyzer = TopicAnalyzer()
+    ranked_topics = analyzer.rank_topics(LENSES_TOPICS)
+    top_topics = analyzer.get_top_fraud_topics(LENSES_TOPICS, limit=3)
+    
+    return {
+        "top_fraud_topics": top_topics,
+        "analysis": ranked_topics[:5]  # Top 5 with details
+    }
+
+@tool
+def query_multi_topic_data(topics=None, limit=5):
+    """Query data from multiple high-priority fraud topics"""
+    if not topics:
+        analyzer = TopicAnalyzer()
+        topics = analyzer.get_top_fraud_topics(LENSES_TOPICS, limit=3)
+    
+    mcp_client = LensesMCPClient()
+    results = {}
+    
+    for topic in topics:
+        sample_data = mcp_client.sample_topic_data(topic, limit)
+        results[topic] = sample_data
+    
+    return results
 
 @tool
 def analyze_fraud_pattern(transactions):
@@ -39,18 +50,26 @@ def analyze_fraud_pattern(transactions):
     }
 
 @tool
-def get_real_time_insights():
-    """Get real-time fraud detection insights from streaming data"""
-    # Query latest transactions
-    transactions = query_fraud_transactions(limit=20)
+def get_comprehensive_fraud_insights():
+    """Get comprehensive fraud insights from all relevant topics"""
+    # Discover top topics
+    topic_analysis = discover_fraud_topics()
     
-    # Analyze patterns
-    analysis = analyze_fraud_pattern(transactions)
+    # Query multi-topic data
+    multi_data = query_multi_topic_data(topic_analysis["top_fraud_topics"])
+    
+    # Analyze patterns across all topics
+    all_transactions = []
+    for topic, data in multi_data.items():
+        all_transactions.extend(data.get("sample_records", []))
+    
+    pattern_analysis = analyze_fraud_pattern(all_transactions)
     
     return {
         "timestamp": "2024-10-15T17:45:00Z",
-        "latest_transactions": transactions[:5],  # Show top 5
-        "pattern_analysis": analysis
+        "topic_discovery": topic_analysis,
+        "multi_topic_data": multi_data,
+        "pattern_analysis": pattern_analysis
     }
 
 def create_fraud_detection_agent():
@@ -72,9 +91,10 @@ def create_fraud_detection_agent():
     return Agent(
         model=MODEL_ID,
         tools=[
-            query_fraud_transactions,
+            discover_fraud_topics,
+            query_multi_topic_data,
             analyze_fraud_pattern,
-            get_real_time_insights
+            get_comprehensive_fraud_insights
         ],
         system_prompt=system_prompt
     )
