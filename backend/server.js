@@ -1,6 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const LensesMCPClient = require('./lenses-mcp-client');
 
 const app = express();
 const PORT = 8080;
@@ -11,8 +13,9 @@ app.use(express.json());
 // Python fraud detection service URL
 const FRAUD_SERVICE_URL = process.env.FRAUD_SERVICE_URL || 'http://localhost:5001';
 
-// Store connected clients
-const clients = new Set();
+// Initialize MCP client
+const mcpClient = new LensesMCPClient();
+mcpClient.startStreaming().catch(console.error);
 
 // Sample transaction data based on the provided format
 const merchants = [
@@ -180,77 +183,20 @@ app.get('/ws', (req, res) => {
   });
 
   const clientId = Date.now();
-  clients.add(res);
+  mcpClient.addClient(res);
 
-  console.log(`Client ${clientId} connected. Total clients: ${clients.size}`);
+  console.log(`Client ${clientId} connected`);
 
-  // Send initial data
+  // Send initial sample data
   sampleInsights.forEach(insight => {
-    res.write(`data: ${JSON.stringify(insight)}\n\n`);
+    res.write(`data: ${JSON.stringify(insight)}
+
+`);
   });
 
-  // Send new insights every 3-5 seconds
-  const interval = setInterval(async () => {
-    if (res.destroyed) {
-      clearInterval(interval);
-      return;
-    }
-
-    const riskLevels = ["OK", "REVIEW", "LIKELY_FRAUD"];
-    const explanations = [
-      "Low risk transaction from trusted merchant",
-      "Unusual spending pattern detected", 
-      "High risk: Multiple failed attempts from new location",
-      "Suspicious merchant category for this customer",
-      "Transaction amount exceeds normal spending pattern",
-      "New location detected for this card",
-      "Multiple rapid transactions detected",
-      "Card used at high-risk merchant",
-      "Unusual time of day for this customer",
-      "Geographic anomaly detected"
-    ];
-    
-    const riskLevel = riskLevels[Math.floor(Math.random() * riskLevels.length)];
-    const explanation = explanations[Math.floor(Math.random() * explanations.length)];
-    
-    try {
-      const newInsight = await generateInsight(riskLevel, explanation);
-      res.write(`data: ${JSON.stringify(newInsight)}\n\n`);
-    } catch (error) {
-      console.error('Error generating insight:', error);
-      // Send fallback insight
-      const fallbackInsight = {
-        event_id: `evt_${Date.now()}`,
-        risk: riskLevel,
-        score: 0.5,
-        explanation: explanation,
-        ts: new Date().toISOString(),
-        transaction_id: generateTransactionId(),
-        card_id: generateTransactionId(),
-        customer_id: generateCustomerId(),
-        merchant_id: generateMerchantId(),
-        card_number: generateCardNumber(),
-        merchant_name: merchants[Math.floor(Math.random() * merchants.length)].name,
-        category: merchants[Math.floor(Math.random() * merchants.length)].category,
-        amount: Math.floor(Math.random() * 50000) / 100,
-        currency: "USD",
-        city: cities[Math.floor(Math.random() * cities.length)],
-        state: states[Math.floor(Math.random() * states.length)],
-        zip: generateZip(),
-        status: "approved",
-        fraud_flag1: false,
-        fraud_flag2: false,
-        fraud_flag3: false,
-        ai_flags: {}
-      };
-      res.write(`data: ${JSON.stringify(fallbackInsight)}\n\n`);
-    }
-  }, Math.random() * 2000 + 3000);
-
   req.on('close', () => {
-    clients.delete(res);
-    clearInterval(interval);
-    console.log(`Client ${clientId} disconnected. Total clients: ${clients.size}`);
+    mcpClient.removeClient(res);
+    console.log(`Client ${clientId} disconnected`);
   });
 });
 
