@@ -2,6 +2,15 @@ export type Risk = "OK" | "REVIEW" | "LIKELY_FRAUD";
 
 export type TransactionStatus = "approved" | "declined" | "pending";
 
+export type AIFlags = {
+  mismatch?: boolean;
+  expected?: string;
+  geo_invalid?: boolean;
+  amount_high?: boolean;
+  velocity_burst?: boolean;
+  high_amount?: boolean;
+};
+
 export type Insight = {
   event_id: string;
   risk: Risk;
@@ -24,4 +33,5 @@ export type Insight = {
   fraud_flag1: boolean;
   fraud_flag2: boolean;
   fraud_flag3: boolean;
+  ai_flags?: AIFlags;   // AI-generated fraud detection flags
 };

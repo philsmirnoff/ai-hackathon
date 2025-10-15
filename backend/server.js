@@ -1,11 +1,15 @@
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 
 const app = express();
 const PORT = 8080;
 
 app.use(cors());
 app.use(express.json());
+
+// Python fraud detection service URL
+const FRAUD_SERVICE_URL = process.env.FRAUD_SERVICE_URL || 'http://localhost:5001';
 
 // Store connected clients
 const clients = new Set();
@@ -51,7 +55,26 @@ function generateZip() {
   return Math.floor(Math.random() * 90000) + 10000;
 }
 
-function generateInsight(riskLevel, explanation) {
+// Function to call Python fraud detection service
+async function analyzeWithAI(transactionData) {
+  try {
+    const response = await axios.post(`${FRAUD_SERVICE_URL}/analyze`, transactionData, {
+      timeout: 5000 // 5 second timeout
+    });
+    return response.data;
+  } catch (error) {
+    console.error('AI fraud detection error:', error.message);
+    // Fallback to rule-based scoring
+    return {
+      risk: "REVIEW",
+      score: 0.5,
+      explanation: "AI analysis unavailable - using fallback",
+      flags: {}
+    };
+  }
+}
+
+async function generateInsight(riskLevel, explanation) {
   const merchant = merchants[Math.floor(Math.random() * merchants.length)];
   const city = cities[Math.floor(Math.random() * cities.length)];
   const state = states[Math.floor(Math.random() * states.length)];
@@ -59,11 +82,9 @@ function generateInsight(riskLevel, explanation) {
   const statuses = ["approved", "declined", "pending"];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
   
-  return {
+  // Create base transaction data
+  const baseTransaction = {
     event_id: `evt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-    risk: riskLevel,
-    score: riskLevel === "OK" ? Math.random() * 0.3 : riskLevel === "REVIEW" ? 0.3 + Math.random() * 0.4 : 0.7 + Math.random() * 0.3,
-    explanation: explanation,
     ts: new Date().toISOString(),
     transaction_id: generateTransactionId(),
     card_id: generateTransactionId(),
@@ -82,14 +103,71 @@ function generateInsight(riskLevel, explanation) {
     fraud_flag2: Math.random() > 0.9,
     fraud_flag3: Math.random() > 0.95
   };
+
+  // Try to get AI analysis
+  try {
+    const aiResult = await analyzeWithAI(baseTransaction);
+    return {
+      ...baseTransaction,
+      risk: aiResult.risk || riskLevel,
+      score: aiResult.score || (riskLevel === "OK" ? Math.random() * 0.3 : riskLevel === "REVIEW" ? 0.3 + Math.random() * 0.4 : 0.7 + Math.random() * 0.3),
+      explanation: aiResult.explanation || explanation,
+      ai_flags: aiResult.flags || {}
+    };
+  } catch (error) {
+    // Fallback to original logic
+    return {
+      ...baseTransaction,
+      risk: riskLevel,
+      score: riskLevel === "OK" ? Math.random() * 0.3 : riskLevel === "REVIEW" ? 0.3 + Math.random() * 0.4 : 0.7 + Math.random() * 0.3,
+      explanation: explanation,
+      ai_flags: {}
+    };
+  }
 }
 
-// Sample fraud insights data
-const sampleInsights = [
-  generateInsight("OK", "Low risk transaction from trusted merchant"),
-  generateInsight("REVIEW", "Unusual spending pattern detected"),
-  generateInsight("LIKELY_FRAUD", "High risk: Multiple failed attempts from new location")
-];
+// Sample fraud insights data (will be populated asynchronously)
+let sampleInsights = [];
+
+// Initialize sample insights
+async function initializeSampleInsights() {
+  try {
+    sampleInsights = [
+      await generateInsight("OK", "Low risk transaction from trusted merchant"),
+      await generateInsight("REVIEW", "Unusual spending pattern detected"),
+      await generateInsight("LIKELY_FRAUD", "High risk: Multiple failed attempts from new location")
+    ];
+  } catch (error) {
+    console.error('Error initializing sample insights:', error);
+    // Fallback to basic insights
+    sampleInsights = [
+      {
+        event_id: "evt_sample_001",
+        risk: "OK",
+        score: 0.15,
+        explanation: "Low risk transaction from trusted merchant",
+        ts: new Date().toISOString(),
+        transaction_id: "CC-0000000001",
+        card_id: "CC-0000000001",
+        customer_id: "CUST-000001",
+        merchant_id: "MERCH-000001",
+        card_number: "****-****-****-1234",
+        merchant_name: "Coffee Shop",
+        category: "Dining",
+        amount: 25.99,
+        currency: "USD",
+        city: "San Francisco",
+        state: "CA",
+        zip: 94102,
+        status: "approved",
+        fraud_flag1: false,
+        fraud_flag2: false,
+        fraud_flag3: false,
+        ai_flags: {}
+      }
+    ];
+  }
+}
 
 // SSE endpoint
 app.get('/ws', (req, res) => {
@@ -112,7 +190,7 @@ app.get('/ws', (req, res) => {
   });
 
   // Send new insights every 3-5 seconds
-  const interval = setInterval(() => {
+  const interval = setInterval(async () => {
     if (res.destroyed) {
       clearInterval(interval);
       return;
@@ -135,9 +213,38 @@ app.get('/ws', (req, res) => {
     const riskLevel = riskLevels[Math.floor(Math.random() * riskLevels.length)];
     const explanation = explanations[Math.floor(Math.random() * explanations.length)];
     
-    const newInsight = generateInsight(riskLevel, explanation);
-
-    res.write(`data: ${JSON.stringify(newInsight)}\n\n`);
+    try {
+      const newInsight = await generateInsight(riskLevel, explanation);
+      res.write(`data: ${JSON.stringify(newInsight)}\n\n`);
+    } catch (error) {
+      console.error('Error generating insight:', error);
+      // Send fallback insight
+      const fallbackInsight = {
+        event_id: `evt_${Date.now()}`,
+        risk: riskLevel,
+        score: 0.5,
+        explanation: explanation,
+        ts: new Date().toISOString(),
+        transaction_id: generateTransactionId(),
+        card_id: generateTransactionId(),
+        customer_id: generateCustomerId(),
+        merchant_id: generateMerchantId(),
+        card_number: generateCardNumber(),
+        merchant_name: merchants[Math.floor(Math.random() * merchants.length)].name,
+        category: merchants[Math.floor(Math.random() * merchants.length)].category,
+        amount: Math.floor(Math.random() * 50000) / 100,
+        currency: "USD",
+        city: cities[Math.floor(Math.random() * cities.length)],
+        state: states[Math.floor(Math.random() * states.length)],
+        zip: generateZip(),
+        status: "approved",
+        fraud_flag1: false,
+        fraud_flag2: false,
+        fraud_flag3: false,
+        ai_flags: {}
+      };
+      res.write(`data: ${JSON.stringify(fallbackInsight)}\n\n`);
+    }
   }, Math.random() * 2000 + 3000);
 
   req.on('close', () => {
@@ -147,7 +254,20 @@ app.get('/ws', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-  console.log(`SSE endpoint available at http://localhost:${PORT}/ws`);
-});
+// Initialize and start server
+async function startServer() {
+  try {
+    await initializeSampleInsights();
+    console.log('Sample insights initialized');
+  } catch (error) {
+    console.error('Error initializing sample insights:', error);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+    console.log(`SSE endpoint available at http://localhost:${PORT}/ws`);
+    console.log(`Fraud detection service: ${FRAUD_SERVICE_URL}`);
+  });
+}
+
+startServer();

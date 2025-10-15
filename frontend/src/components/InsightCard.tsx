@@ -97,9 +97,18 @@ export function InsightCard({ insight, isNew = false }: InsightCardProps) {
         </div>
       </div>
 
-      {(insight.fraud_flag1 || insight.fraud_flag2 || insight.fraud_flag3) && (
+      {((insight.fraud_flag1 || insight.fraud_flag2 || insight.fraud_flag3) || (insight.ai_flags && Object.values(insight.ai_flags).some(Boolean))) && (
         <div style={{ marginTop: '8px', padding: '6px 8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '11px', color: '#dc2626' }}>
-          ⚠️ Fraud flags: {[insight.fraud_flag1 && 'Flag1', insight.fraud_flag2 && 'Flag2', insight.fraud_flag3 && 'Flag3'].filter(Boolean).join(', ')}
+          ⚠️ Fraud flags: {[
+            insight.fraud_flag1 && 'Flag1', 
+            insight.fraud_flag2 && 'Flag2', 
+            insight.fraud_flag3 && 'Flag3',
+            insight.ai_flags?.mismatch && 'Merchant Mismatch',
+            insight.ai_flags?.geo_invalid && 'Geo Invalid',
+            insight.ai_flags?.amount_high && 'High Amount',
+            insight.ai_flags?.velocity_burst && 'Velocity Burst',
+            insight.ai_flags?.high_amount && 'Very High Amount'
+          ].filter(Boolean).join(', ')}
         </div>
       )}
     </div>
