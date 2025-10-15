@@ -1,12 +1,67 @@
-# AI-Powered Fraud Detector - Real-time Financial Intelligence
+# 🚨 AI-Powered Fraud Detector - Real-time Financial Intelligence
 
-A sophisticated real-time fraud detection system powered by AI models and rule-based analysis, built for the "Build the future of finance with real-time data and AI" hackathon.
+A sophisticated real-time fraud detection system that combines AI models with rule-based analysis to identify suspicious financial transactions as they happen. Built for the "Build the future of finance with real-time data and AI" hackathon.
+
+## 🎯 **What This Does**
+
+This system monitors financial transactions in real-time and automatically flags potentially fraudulent activity using:
+- **AI-powered analysis** with machine learning models
+- **Rule-based detection** for known fraud patterns  
+- **Real-time streaming** via Server-Sent Events
+- **Interactive dashboard** for fraud analysts
+
+## 🏗️ **Repository Structure**
+
+```
+fraud-detector/
+├── 🤖 fraud_detection_service.py    # Python AI service (Flask + MCP)
+├── 🔧 backend/                      # Node.js backend with SSE
+│   ├── server.js                   # Express server + AI integration
+│   └── package.json                # Backend dependencies
+├── ⚛️ frontend/                     # React dashboard
+│   ├── src/
+│   │   ├── components/             # UI components
+│   │   ├── hooks/                  # Custom React hooks
+│   │   └── types.ts                # TypeScript definitions
+│   └── package.json                # Frontend dependencies
+├── 📋 requirements.txt             # Python dependencies
+├── 🚀 start_services.sh            # One-command startup script
+└── 📖 README.md                    # This file
+```
+
+## 🔄 **How It Works**
+
+1. **Transaction Data** flows into the system (currently mock data, ready for Lenses integration)
+2. **AI Service** analyzes each transaction using rule-based + ML models
+3. **Backend** streams results via Server-Sent Events to the dashboard
+4. **Frontend** displays real-time fraud insights with filtering and search
+5. **Fraud Analysts** can review flagged transactions and take action
 
 ## 🚀 Quick Start
 
+### **Prerequisites**
+- **Python 3.8+** with pip
+- **Node.js 16+** with npm
+- **Git** (to clone the repository)
+
+### **Setup**
+```bash
+# Clone the repository
+git clone <repository-url>
+cd fraud-detector
+
+# Install Python dependencies
+pip3 install -r requirements.txt
+
+# Install Node.js dependencies
+cd backend && npm install
+cd ../frontend && npm install
+cd ..
+```
+
 ### **Option 1: All-in-One Startup (Recommended)**
 ```bash
-cd /Users/ilfiryakupov/Desktop/fraud-detector
+cd fraud-detector
 ./start_services.sh
 ```
 This will start all services automatically:
@@ -20,21 +75,21 @@ This will start all services automatically:
 
 #### **Step 1: Start Python AI Service**
 ```bash
-cd /Users/ilfiryakupov/Desktop/fraud-detector
+cd fraud-detector
 python3 fraud_detection_service.py
 ```
 *Keep this terminal open - runs on port 5001*
 
 #### **Step 2: Start Backend (New Terminal)**
 ```bash
-cd /Users/ilfiryakupov/Desktop/fraud-detector/backend
+cd fraud-detector/backend
 npm start
 ```
 *Keep this terminal open - runs on port 8080*
 
 #### **Step 3: Start Frontend (New Terminal)**
 ```bash
-cd /Users/ilfiryakupov/Desktop/fraud-detector/frontend
+cd fraud-detector/frontend
 npm run dev
 ```
 *Keep this terminal open - runs on port 5173*
@@ -65,15 +120,65 @@ pip3 install -r requirements.txt
 # Node.js dependencies
 cd backend && npm install
 cd ../frontend && npm install
+cd ..
 ```
 
-## 🏗️ Architecture
+**Check if services are running:**
+```bash
+# Check Python service
+curl http://localhost:5001/health
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **Real-time**: Server-Sent Events (SSE)
-- **Backend**: Express.js with SSE streaming + AI integration
-- **AI Service**: Python Flask + Strands AI + MCP Client
-- **Data Flow**: Transaction Data → AI Analysis → SSE → React Dashboard
+# Check backend service  
+curl http://localhost:8080/ws
+
+# Check frontend (open in browser)
+open http://localhost:5173
+```
+
+## 🏗️ **Technical Architecture**
+
+### **Frontend (React Dashboard)**
+- **Framework**: React 18 + TypeScript + Vite
+- **Real-time**: Server-Sent Events (SSE) for live updates
+- **UI**: Custom components with responsive design
+- **State**: React hooks for real-time data management
+- **Port**: 5173
+
+### **Backend (Node.js API)**
+- **Framework**: Express.js with CORS support
+- **Streaming**: Server-Sent Events for real-time data
+- **AI Integration**: HTTP calls to Python fraud detection service
+- **Data**: Mock transaction generation (ready for Lenses integration)
+- **Port**: 8080
+
+### **AI Service (Python ML)**
+- **Framework**: Flask with CORS support
+- **ML Integration**: MCP client for AI model inference
+- **Detection**: Rule-based + AI-powered fraud analysis
+- **Scoring**: 0.0-1.0 confidence levels with risk labels
+- **Port**: 5001
+
+### **Data Flow**
+```
+Transaction Data → AI Analysis → Risk Scoring → SSE Stream → React Dashboard
+     ↓                ↓              ↓            ↓              ↓
+  Mock/Lenses → Python Service → Backend API → Real-time → Fraud Analyst
+```
+
+## 🔍 **Fraud Detection Logic**
+
+### **Rule-Based Detection**
+- **Merchant/Category Mismatch**: Shell Gas categorized as "Clothing"
+- **Geographic Anomalies**: Los Angeles, PA (invalid city-state pairs)
+- **Amount Thresholds**: High amounts for specific categories
+- **Velocity Bursts**: Multiple rapid transactions from same card
+- **High-Value Transactions**: Transactions over $1000
+
+### **AI-Powered Analysis**
+- **MCP Integration**: Uses AI models via MCP server
+- **Contextual Analysis**: Time, location, spending patterns
+- **Confidence Scoring**: 0.0-1.0 with explanations
+- **Risk Labeling**: OK (0.0-0.34), REVIEW (0.35-0.59), LIKELY_FRAUD (0.60-1.0)
 
 ## ✨ Features
 
@@ -106,20 +211,65 @@ This project demonstrates:
 - Server-Sent Events for live updates
 - Financial use case with practical insights
 
-## 📊 Data Format
+## 📊 **Transaction Data Format**
+
+The system processes transactions with comprehensive fraud analysis:
 
 ```typescript
 {
-  event_id: string;
+  // Core identifiers
+  event_id: string;           // Unique event identifier
+  transaction_id: string;     // Transaction reference
+  card_id: string;           // Card identifier
+  customer_id: string;       // Customer reference
+  
+  // Transaction details
+  merchant_id: string;       // Merchant identifier
+  merchant_name: string;     // Merchant name (e.g., "Shell Gas")
+  category: string;          // Transaction category (e.g., "Gas")
+  amount: number;            // Transaction amount
+  currency: string;          // Currency code (e.g., "USD")
+  
+  // Location data
+  city: string;              // Transaction city
+  state: string;             // Transaction state
+  zip: string;               // ZIP code
+  
+  // Status and flags
+  status: "approved" | "declined" | "pending";
+  fraud_flag1: boolean;      // Rule-based flag 1
+  fraud_flag2: boolean;      // Rule-based flag 2  
+  fraud_flag3: boolean;      // Rule-based flag 3
+  
+  // AI analysis results
   risk: "OK" | "REVIEW" | "LIKELY_FRAUD";
-  score: number;        // 0..1
-  explanation: string;  // AI reasoning
-  ts: string;           // ISO timestamp
-  user_id?: string;
-  amount?: number;
-  merchant?: string;
+  score: number;             // 0.0-1.0 confidence
+  explanation: string;       // AI reasoning
+  ai_flags: {                // AI-generated flags
+    mismatch?: boolean;      // Merchant/category mismatch
+    geo_invalid?: boolean;   // Geographic anomaly
+    amount_high?: boolean;   // High amount for category
+    velocity_burst?: boolean; // Rapid transactions
+    high_amount?: boolean;   // Very high amount
+  };
+  
+  // Timestamps
+  ts: string;                // ISO timestamp
 }
 ```
+
+## 🔌 **Integration Ready**
+
+### **Lenses SQL Integration**
+The system is designed to integrate with Lenses for real-time transaction streaming:
+- Replace mock data generation with Lenses SQL queries
+- Connect to Kafka topics via Lenses
+- Stream live transaction data for fraud analysis
+
+### **MCP Server Integration**
+- Configure MCP endpoint and AWS Bedrock tokens
+- Use environment variables or AWS SSM parameters
+- AI models provide enhanced fraud detection capabilities
 
 ## 🛠️ Development
 
