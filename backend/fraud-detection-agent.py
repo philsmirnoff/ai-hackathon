@@ -1,6 +1,7 @@
 import os
 import json
 import boto3
+from functools import partial
 from strands import Agent, tool
 from topic_analyzer import TopicAnalyzer, LENSES_TOPICS
 from mcp_client import LensesMCPClient
@@ -9,9 +10,8 @@ from mcp_client import LensesMCPClient
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 @tool
-def discover_fraud_topics():
+def discover_fraud_topics(analyzer: TopicAnalyzer):
     """Dynamically discover and rank fraud-relevant topics"""
-    analyzer = TopicAnalyzer()
     ranked_topics = analyzer.rank_topics(LENSES_TOPICS)
     top_topics = analyzer.get_top_fraud_topics(LENSES_TOPICS, limit=3)
     
@@ -21,13 +21,11 @@ def discover_fraud_topics():
     }
 
 @tool
-def query_multi_topic_data(topics=None, limit=5):
+def query_multi_topic_data(mcp_client: LensesMCPClient, analyzer: TopicAnalyzer, topics=None, limit=5):
     """Query data from multiple high-priority fraud topics"""
     if not topics:
-        analyzer = TopicAnalyzer()
         topics = analyzer.get_top_fraud_topics(LENSES_TOPICS, limit=3)
     
-    mcp_client = LensesMCPClient()
     results = {}
     
     for topic in topics:
@@ -50,13 +48,13 @@ def analyze_fraud_pattern(transactions):
     }
 
 @tool
-def get_comprehensive_fraud_insights():
+def get_comprehensive_fraud_insights(analyzer: TopicAnalyzer, mcp_client: LensesMCPClient):
     """Get comprehensive fraud insights from all relevant topics"""
-    # Discover top topics
-    topic_analysis = discover_fraud_topics()
+    # Discover top topics using the passed-in analyzer
+    topic_analysis = discover_fraud_topics(analyzer)
     
-    # Query multi-topic data
-    multi_data = query_multi_topic_data(topic_analysis["top_fraud_topics"])
+    # Query multi-topic data using passed-in clients and discovered topics
+    multi_data = query_multi_topic_data(mcp_client, analyzer, topic_analysis["top_fraud_topics"])
     
     # Analyze patterns across all topics
     all_transactions = []
@@ -88,13 +86,19 @@ def create_fraud_detection_agent():
     Provide clear, actionable recommendations based on the streaming data.
     """
     
+    # Instantiate clients once to be shared by all tools
+    analyzer = TopicAnalyzer()
+    mcp_client = LensesMCPClient()
+    
     return Agent(
         model=MODEL_ID,
         tools=[
-            discover_fraud_topics,
-            query_multi_topic_data,
+            # Partially apply the clients to the tool functions.
+            # This pre-fills the 'analyzer' and 'mcp_client' arguments.
+            partial(discover_fraud_topics, analyzer=analyzer),
+            partial(query_multi_topic_data, mcp_client=mcp_client, analyzer=analyzer),
             analyze_fraud_pattern,
-            get_comprehensive_fraud_insights
+            partial(get_comprehensive_fraud_insights, analyzer=analyzer, mcp_client=mcp_client)
         ],
         system_prompt=system_prompt
     )
