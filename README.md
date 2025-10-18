@@ -1,6 +1,7 @@
 # 🚨 AI-Powered Fraud Detector - Real-time Financial Intelligence
 
 A sophisticated real-time fraud detection system that combines AI models with rule-based analysis to identify suspicious financial transactions as they happen. Built for the "Build the future of finance with real-time data and AI" hackathon.
+<img width="1440" height="900" alt="Screenshot 2025-10-15 at 4 14 29 PM" src="https://github.com/user-attachments/assets/813d6515-e714-4cd7-a5a8-ce141290d2ca" />
 
 ## 🎯 **What This Does**
 
