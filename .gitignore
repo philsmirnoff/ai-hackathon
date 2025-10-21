@@ -1,0 +1,15 @@
+# Environment variables
+.env
+backend/.env
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build outputs
+dist/
+build/
